@@ -11,45 +11,52 @@ class PlayerPerformanceController extends Controller
 {
     // Store or update a player's performance for a match
     public function store(Request $request)
-    {
-        $data = $request->validate([
-            'match_player_id' => 'required|exists:match_players,id',
+{
+    // If a single object is sent, wrap it in an array
+    $data = $request->all();
+    if (isset($data['match_player_id'])) {
+        $data = [$data];
+    }
 
-            'runs' => 'required|integer|min:0',
-            'fours' => 'required|integer|min:0',
-            'sixes' => 'required|integer|min:0',
-            'balls_faced' => 'nullable|integer|min:0',
+    $performances = validator($data, [
+        '*.match_player_id' => 'required|exists:match_players,id',
+        '*.runs' => 'required|integer|min:0',
+        '*.fours' => 'required|integer|min:0',
+        '*.sixes' => 'required|integer|min:0',
+        '*.balls_faced' => 'nullable|integer|min:0',
+        '*.wickets' => 'required|integer|min:0',
+        '*.lbw_or_bowled' => 'nullable|boolean',
+        '*.maidens' => 'nullable|integer|min:0',
+        '*.no_balls' => 'nullable|integer|min:0',
+        '*.wides' => 'nullable|integer|min:0',
+        '*.byes' => 'nullable|integer|min:0',
+        '*.leg_byes' => 'nullable|integer|min:0',
+        '*.catches' => 'nullable|integer|min:0',
+        '*.stumpings' => 'nullable|integer|min:0',
+        '*.run_outs' => 'nullable|integer|min:0',
+    ])->validate();
 
-            'wickets' => 'required|integer|min:0',
-            'lbw_or_bowled' => 'nullable|boolean',
-            'maidens' => 'nullable|integer|min:0',
-            'no_balls' => 'nullable|integer|min:0',
-            'wides' => 'nullable|integer|min:0',
-            'byes' => 'nullable|integer|min:0',
-            'leg_byes' => 'nullable|integer|min:0',
+    $results = [];
 
-            'catches' => 'nullable|integer|min:0',
-            'stumpings' => 'nullable|integer|min:0',
-            'run_outs' => 'nullable|integer|min:0',
-        ]);
-
-        $matchPlayer = MatchPlayer::findOrFail($data['match_player_id']);
-
-        // Calculate points
+    foreach ($performances as $data) {
         $points = $this->calculateBattingPoints($data['runs'], $data['fours'], $data['sixes'])
-                + $this->calculateBowlingPoints(
-                    $data['wickets'], $data['lbw_or_bowled'] ?? false, $data['maidens'] ?? 0,
-                    $data['no_balls'] ?? 0, $data['wides'] ?? 0
-                )
-                + $this->calculateFieldingPoints($data['catches'] ?? 0, $data['stumpings'] ?? 0, $data['run_outs'] ?? 0);
+            + $this->calculateBowlingPoints(
+                $data['wickets'], $data['lbw_or_bowled'] ?? false,
+                $data['maidens'] ?? 0, $data['no_balls'] ?? 0, $data['wides'] ?? 0
+            )
+            + $this->calculateFieldingPoints(
+                $data['catches'] ?? 0, $data['stumpings'] ?? 0, $data['run_outs'] ?? 0
+            );
 
-        $performance = PlayerPerformance::updateOrCreate(
+        $results[] = PlayerPerformance::updateOrCreate(
             ['match_player_id' => $data['match_player_id']],
             array_merge($data, ['points' => $points])
         );
-
-        return response()->json($performance, 201);
     }
+
+    return response()->json($results, 201);
+}
+
 
     private function calculateBattingPoints($runs, $fours, $sixes)
     {
@@ -79,3 +86,5 @@ class PlayerPerformanceController extends Controller
         return ($catches * 8) + ($stumpings * 12) + ($runOuts * 6);
     }
 }
+
+//i neeed profoance tables data for all playes  

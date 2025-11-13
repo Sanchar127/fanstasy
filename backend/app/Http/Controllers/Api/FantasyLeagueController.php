@@ -16,17 +16,41 @@ class FantasyLeagueController extends Controller
 
     // Create a new league (admin only)
     public function store(Request $request)
-{
-    $request->validate([
-        'name' => 'required|string|unique:fantasy_leagues,name',
-    ]);
+    {
+        $request->validate([
+            'name' => 'required|string|unique:fantasy_leagues,name',
+        ]);
 
-    $league = FantasyLeague::create([
-        'name' => $request->name,
-        'created_by' => $request->user()->id, // ✅ Automatically assign logged-in admin
-    ]);
+        $league = FantasyLeague::create([
+            'name' => $request->name,
+            'created_by' => $request->user()->id, // Assign logged-in admin
+        ]);
 
-    return response()->json($league, 201);
-}
+        return response()->json($league, 201);
+    }
 
+    // Update an existing league
+    public function update(Request $request, $id)
+    {
+        $league = FantasyLeague::findOrFail($id);
+
+        $request->validate([
+            'name' => 'required|string|unique:fantasy_leagues,name,' . $league->id,
+        ]);
+
+        $league->update([
+            'name' => $request->name,
+        ]);
+
+        return response()->json($league);
+    }
+
+    // Delete a league
+    public function destroy($id)
+    {
+        $league = FantasyLeague::findOrFail($id);
+        $league->delete();
+
+        return response()->json(['message' => 'League deleted successfully']);
+    }
 }

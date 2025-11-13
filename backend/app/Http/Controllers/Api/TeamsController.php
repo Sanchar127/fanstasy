@@ -10,14 +10,25 @@ use Illuminate\Support\Facades\Log;
 class TeamsController extends Controller
 {
     /**
+     * List all teams with their associated fantasy league
+     */
+    public function index()
+    {
+        $teams = Team::with('league')->get();
+
+        Log::info('Teams list retrieved', [
+            'user_id' => auth()->id(),
+            'count' => $teams->count()
+        ]);
+
+        return response()->json($teams);
+    }
+
+    /**
      * Store single or multiple teams for a fantasy league
-     *
-     * @param Request $request
-     * @return \Illuminate\Http\JsonResponse
      */
     public function store(Request $request)
     {
-        // Validate request
         $request->validate([
             'fantasy_league_id' => 'required|exists:fantasy_leagues,id',
             'name' => 'sometimes|required|string',
@@ -25,17 +36,15 @@ class TeamsController extends Controller
             'teams.*.name' => 'required|string|distinct'
         ]);
 
-        $userId = auth()->id(); // Logged-in user
+        $userId = auth()->id();
 
         // --- Single team insert ---
         if ($request->has('name')) {
-
             $team = Team::create([
                 'name' => $request->name,
                 'fantasy_league_id' => $request->fantasy_league_id,
             ]);
 
-            // ✅ Log the single team creation
             Log::info('Single team created', [
                 'user_id' => $userId,
                 'team_id' => $team->id,
@@ -51,7 +60,6 @@ class TeamsController extends Controller
 
         // --- Bulk insert ---
         if ($request->has('teams')) {
-
             $teamsData = [];
             foreach ($request->teams as $team) {
                 $teamsData[] = [
@@ -64,12 +72,10 @@ class TeamsController extends Controller
 
             Team::insert($teamsData);
 
-            // ✅ Log bulk insert
             Log::info('Bulk teams created', [
                 'user_id' => $userId,
                 'fantasy_league_id' => $request->fantasy_league_id,
                 'count' => count($teamsData),
-                'teams' => $teamsData
             ]);
 
             return response()->json([
@@ -79,27 +85,56 @@ class TeamsController extends Controller
             ], 201);
         }
 
-        // ❌ Invalid request log
-        Log::warning('Invalid team creation request', [
-            'user_id' => $userId,
-            'payload' => $request->all()
-        ]);
-
         return response()->json(['error' => 'Invalid request.'], 400);
     }
 
     /**
-     * List all teams
+     * Update a specific team
      */
-    public function index()
+    public function update(Request $request, $teamId)
     {
-        $teams = Team::with('league')->get();
-
-        Log::info('Teams list retrieved', [
-            'user_id' => auth()->id(),
-            'count' => $teams->count()
+        $request->validate([
+            'name' => 'required|string',
         ]);
 
-        return response()->json($teams);
+        $team = Team::find($teamId);
+
+        if (!$team) {
+            return response()->json(['error' => 'Team not found'], 404);
+        }
+
+        $team->update(['name' => $request->name]);
+
+        Log::info('Team updated', [
+            'user_id' => auth()->id(),
+            'team_id' => $team->id,
+            'new_name' => $team->name,
+        ]);
+
+        return response()->json([
+            'message' => 'Team updated successfully',
+            'team' => $team
+        ]);
+    }
+
+    /**
+     * Delete a team
+     */
+    public function destroy($teamId)
+    {
+        $team = Team::find($teamId);
+
+        if (!$team) {
+            return response()->json(['error' => 'Team not found'], 404);
+        }
+
+        $team->delete();
+
+        Log::info('Team deleted', [
+            'user_id' => auth()->id(),
+            'team_id' => $teamId,
+        ]);
+
+        return response()->json(['message' => 'Team deleted successfully']);
     }
 }
